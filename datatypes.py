@@ -18,6 +18,7 @@ class DocumentConfig:
 
         # standardized DocumentRef- (including that prefix) that the other
         # docs will use to refer to this one
+        # FIXME not currently used for single-document setup
         self.docRefID = ""
 
 # Document contains the data assembled by the SBOM builder, to be used to
@@ -38,14 +39,17 @@ class Document:
         self.relationships = []
 
         # set of other Documents that our elements' Relationships refer to
+        # FIXME not currently used for single-document setup
         self.externalDocuments = set()
 
         # set of LicenseRef- custom licenses to be declared
         # may or may not include "LicenseRef-" license prefix
+        # FIXME not currently used until LicenseRef- IDs are handled
         self.customLicenseIDs = set()
 
         # this Document's SHA1 hash, filled in _after_ the Document has been
         # written to disk, so that others can refer to it
+        # FIXME not currently used for single-document setup
         self.myDocSHA1 = ""
 
 # PackageConfig contains settings used to configure how an SPDX Package should
@@ -155,3 +159,22 @@ class File:
 
         # Document that owns this File
         self.doc = None
+
+# Relationship contains the post-analysis, processed data about a relationship
+# in a form suitable for creating the actual SPDX Relationship in a particular
+# Document's context.
+class Relationship:
+    def __init__(self):
+        super(Relationship, self).__init__()
+
+        # SPDX ID for left side of relationship
+        # including "SPDXRef-" as well as "DocumentRef-" if needed
+        self.refA = ""
+
+        # SPDX ID for right side of relationship
+        # including "SPDXRef-" as well as "DocumentRef-" if needed
+        self.refB = ""
+
+        # text string with Relationship type
+        # from table in section 7.1 of SPDX spec v2.2
+        self.rlnType = ""

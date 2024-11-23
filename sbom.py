@@ -8,13 +8,9 @@ import argparse
 import os
 import uuid
 
-# FIXME TEMP for testing
-import sys
-from testing import printPackage
-
-from datatypes import PackageConfig
+from datatypes import Document, DocumentConfig, PackageConfig, Relationship
 from scanner import ScannerConfig, scanPackage
-#from writer import writeSPDX
+from writer import writeSPDX
 
 # SBOMConfig contains settings that will be passed along to the various
 # SBOM maker subcomponents.
@@ -48,7 +44,7 @@ class SBOMConfig:
 
         # name to use for package prefixes
         # argument: --package-name
-        self.packageName = ""
+        self.packageName = "mycode"
 
         # version number to use for packages
         # argument: --package-version
@@ -110,57 +106,103 @@ class SBOMConfig:
         if args.pretty:
             self.pretty = True
 
+# Create SPDX Document containing two Packages, sources and builds,
+# with all files contained in either, all relationships, and all
+# corresponding metadata.
+# Arguments:
+#   1) sbomConfig: SBOMConfig
+#   2) srcPkg: sources Package
+#   3) buildPkg: builds Package
+def makeSPDXDocument(sbomCfg, srcPkg, buildPkg):
+    # prepare Document configuration
+    docCfg = DocumentConfig()
+    docCfg.name = f"{sbomCfg.packageName} sources and builds"
+    docCfg.namespace = sbomCfg.namespacePrefix
+
+    # build Document
+    doc = Document(docCfg)
+
+    # add entry and relationship for sources package
+    doc.pkgs[srcPkg.cfg.spdxID] = srcPkg
+    srcRln = Relationship()
+    srcRln.refA = "SPDXRef-DOCUMENT"
+    srcRln.refB = srcPkg.cfg.spdxID
+    srcRln.rlnType = "DESCRIBES"
+    doc.relationships.append(srcRln)
+
+    # add entry and relationship for builds package
+    doc.pkgs[buildPkg.cfg.spdxID] = buildPkg
+    buildRln = Relationship()
+    buildRln.refA = "SPDXRef-DOCUMENT"
+    buildRln.refB = buildPkg.cfg.spdxID
+    buildRln.rlnType = "DESCRIBES"
+    doc.relationships.append(buildRln)
+
+    # add relationship for builds package built from sources package
+    sbRln = Relationship()
+    sbRln.refA = buildPkg.cfg.spdxID
+    sbRln.refB = srcPkg.cfg.spdxID
+    sbRln.rlnType = "GENERATED_FROM"
+    doc.relationships.append(sbRln)
+
+    return doc
+
 # main entry point for SBOM maker
 # Arguments:
 #   1) cfg: SBOMConfig
-def makeSPDX(sbomCfg):
+def makeAndWriteSPDX(sbomCfg):
+    # ===== sources package =====
     # set up configuration for sources package
-    pkgCfg = PackageConfig()
-    pkgCfg.fileListPath = sbomCfg.sourceList
-    # FIXME confirm whether relativeBaseDir is correct
-    #pkgCfg.relativeBaseDir = os.path.abspath(os.path.commonpath(filesToScan))
-    pkgCfg.basedir = os.path.abspath(sbomCfg.srcdir)
+    pkgCfgSources = PackageConfig()
+    pkgCfgSources.fileListPath = sbomCfg.sourceList
+    pkgCfgSources.basedir = os.path.abspath(sbomCfg.srcdir)
 
-    pkgCfg.name = f"{sbomCfg.packageName} sources"
-    pkgCfg.version = sbomCfg.packageVersion
-    pkgCfg.declaredLicense = sbomCfg.packageDeclaredLicense
-    if sbomCfg.supplierOrganization != "":
-        pkgCfg.supplierOrg = sbomCfg.supplierOrganization
+    if sbomCfg.packageName:
+        pkgCfgSources.name = f"{sbomCfg.packageName} sources"
     else:
-        pkgCfg.supplierPerson = sbomCfg.supplierPerson
-    pkgCfg.spdxID = "SPDXRef-Package-sources"
+        pkgCfgSources.name = f"sources"
+    pkgCfgSources.version = sbomCfg.packageVersion
+    pkgCfgSources.declaredLicense = sbomCfg.packageDeclaredLicense
+    if sbomCfg.supplierOrganization != "":
+        pkgCfgSources.supplierOrg = sbomCfg.supplierOrganization
+    else:
+        pkgCfgSources.supplierPerson = sbomCfg.supplierPerson
+    pkgCfgSources.spdxID = "SPDXRef-Package-sources"
 
     # scan sources file list and build Package and Files metadata
-    scanCfg = ScannerConfig()
-    srcPkg = scanPackage(scanCfg, pkgCfg)
+    scanCfgSources = ScannerConfig()
+    srcPkg = scanPackage(scanCfgSources, pkgCfgSources)
 
-    # FIXME TEMP testing
-    printPackage(srcPkg)
-    sys.exit(1)
+    # ===== builds package =====
+    # set up configuration for builds package
+    pkgCfgBuilds = PackageConfig()
+    pkgCfgBuilds.fileListPath = sbomCfg.buildList
+    pkgCfgBuilds.basedir = os.path.abspath(sbomCfg.builddir)
 
-    # FIXME add builds package
+    if sbomCfg.packageName:
+        pkgCfgBuilds.name = f"{sbomCfg.packageName} builds"
+    else:
+        pkgCfgBuilds.name = f"builds"
+    pkgCfgBuilds.version = sbomCfg.packageVersion
+    pkgCfgBuilds.declaredLicense = sbomCfg.packageDeclaredLicense
+    if sbomCfg.supplierOrganization != "":
+        pkgCfgBuilds.supplierOrg = sbomCfg.supplierOrganization
+    else:
+        pkgCfgBuilds.supplierPerson = sbomCfg.supplierPerson
+    pkgCfgBuilds.spdxID = "SPDXRef-Package-builds"
 
-    # FIXME stopping here to test srcPkg contents
-    return srcPkg
+    # scan builds file list and build Package and Files metadata
+    scanCfgBuilds = ScannerConfig()
+    buildPkg = scanPackage(scanCfgBuilds, pkgCfgBuilds)
 
-    # write each document, in this particular order so that the
-    # hashes for external references are calculated
+    # build single SPDX Document with sources and builds Packages
+    doc = makeSPDXDocument(sbomCfg, srcPkg, buildPkg)
 
-    # write sources document
-    writeSPDX(os.path.join(cfg.spdxDir, "sources.spdx"), w.docZephyr)
-    if not retval:
-        log.err("SPDX writer failed for zephyr document; bailing")
-        return False
+    # write document as SPDX JSON
+    writeSPDX(sbomCfg.outputDir, doc, sbomCfg.pretty)
 
-    # write build document
-    writeSPDX(os.path.join(cfg.spdxDir, "build.spdx"), w.docBuild)
-    if not retval:
-        log.err("SPDX writer failed for build document; bailing")
-        return False
-
-    return True
 
 if __name__ == "__main__":
     sbomCfg = SBOMConfig()
     sbomCfg.argparse()
-    makeSPDX(sbomCfg)
+    makeAndWriteSPDX(sbomCfg)
