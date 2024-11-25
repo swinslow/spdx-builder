@@ -67,6 +67,35 @@ def makeSPDXJSONPackage(p, docFiles):
 
     return pj
 
+# Create and return array for SPDX "Other Licensing Info"
+# sections based on "LicenseRef-" license IDs in SPDX Document,
+# or empty list if none.
+def makeSPDXJSONOtherLicensingInfo(doc):
+    # FIXME for now, just create placeholder extractedText for each
+    licenseRefs = set()
+
+    # FIXME should also handle DocumentRef-...:LicenseRef-... format
+    for pkg in doc.pkgs.values():
+        # check package's own licenses
+        # FIXME for declared license, should check components of expression
+        if pkg.cfg.declaredLicense.startswith("LicenseRef-"):
+            licenseRefs.add(pkg.cfg.declaredLicense)
+        # check licenseInfoFromFiles => shouldn't need to check each
+        # individual file
+        for l in pkg.licenseInfoFromFiles:
+            if l.startswith("LicenseRef-"):
+                licenseRefs.add(l)
+
+    lj = []
+    for lr in sorted(licenseRefs):
+        lj.append({
+            "licenseId": lr,
+            "comment": f"Corresponds to the license ID `{lr}` detected in an SPDX-License-Identifier: tag.",
+            "extractedText": lr,
+            "name": lr,
+        })
+    return lj
+
 # Create and return dict for SPDX Document JSON data, with
 # sources and builds packages, all corresponding files, and
 # all related relationships and other metadata.
@@ -108,6 +137,11 @@ def makeSPDXJSONDocument(doc):
             "relationshipType": rln.rlnType,
         }
         dj["relationships"].append(rj)
+
+    # add other license info section, if any
+    lj = makeSPDXJSONOtherLicensingInfo(doc)
+    if len(lj) > 0:
+        dj["hasExtractedLicensingInfos"] = lj
 
     return dj
 
