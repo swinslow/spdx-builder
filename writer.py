@@ -38,10 +38,11 @@ def makeSPDXJSONPackage(p, docFiles):
     # get data from PackageConfig
     pj["SPDXID"] = p.cfg.spdxID
     pj["name"] = p.cfg.name
-    pj["versionInfo"] = p.cfg.version
+    if p.cfg.version:
+        pj["versionInfo"] = p.cfg.version
     if p.cfg.supplierOrg:
         pj["supplier"] = f"Organization: {p.cfg.supplierOrg}"
-    else:
+    elif p.cfg.supplierPerson:
         pj["supplier"] = f"Person: {p.cfg.supplierPerson}"
     pj["licenseDeclared"] = p.cfg.declaredLicense
     pj["copyrightText"] = p.cfg.copyrightText
@@ -53,7 +54,7 @@ def makeSPDXJSONPackage(p, docFiles):
     pj["licenseInfoFromFiles"] = p.licenseInfoFromFiles
     pj["filesAnalyzed"] = True
     pj["packageVerificationCode"] = {
-        "packageVerificationCodeExcludedFiles": [],
+        #"packageVerificationCodeExcludedFiles": [],
         "packageVerificationCodeValue": p.verificationCode,
     }
 
